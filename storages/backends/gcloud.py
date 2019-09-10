@@ -85,6 +85,7 @@ class GoogleCloudFile(File):
 class GoogleCloudStorage(Storage):
     project_id = setting('GS_PROJECT_ID')
     credentials = setting('GS_CREDENTIALS')
+    signer_credentials = setting('GS_SIGNER_CREDENTIALS')
     bucket_name = setting('GS_BUCKET_NAME')
     location = setting('GS_LOCATION', '')
     auto_create_bucket = setting('GS_AUTO_CREATE_BUCKET', False)
@@ -112,9 +113,18 @@ class GoogleCloudStorage(Storage):
         self._bucket = None
         self._client = None
 
+        self._signer_bucket = None
+        self._signer_client = None
+
+    @property
+    def bucket(self):
+        if self._bucket is None:
+            self._bucket = self._get_or_create_bucket(self.bucket_name)
+        return self._bucket
+
     @property
     def client(self):
-        if self._client is None:
+        if self._ is None:
             self._client = Client(
                 project=self.project_id,
                 credentials=self.credentials
@@ -122,10 +132,21 @@ class GoogleCloudStorage(Storage):
         return self._client
 
     @property
-    def bucket(self):
-        if self._bucket is None:
-            self._bucket = self._get_or_create_bucket(self.bucket_name)
-        return self._bucket
+    def signer_bucket(self):
+        if self._signer_bucket is None:
+            self._signer_bucket = self._get_or_create_signer_bucket(
+                self.bucket_name
+            )
+        return self._signer_bucket
+
+    @property
+    def signer_client(self):
+        if self._signer_client is None:
+            self._client = Client(
+                project=self.project_id,
+                credentials=self.signer_credentials
+            )
+        return self._signer_client
 
     def _get_or_create_bucket(self, name):
         """
@@ -136,6 +157,22 @@ class GoogleCloudStorage(Storage):
         except NotFound:
             if self.auto_create_bucket:
                 bucket = self.client.create_bucket(name)
+                bucket.acl.save_predefined(self.auto_create_acl)
+                return bucket
+            raise ImproperlyConfigured("Bucket %s does not exist. Buckets "
+                                       "can be automatically created by "
+                                       "setting GS_AUTO_CREATE_BUCKET to "
+                                       "``True``." % name)
+
+    def _get_or_create_signer_bucket(self, name):
+        """
+        Retrieves a bucket if it exists, otherwise creates it.
+        """
+        try:
+            return self.signer_client.get_bucket(name)
+        except NotFound:
+            if self.auto_create_bucket:
+                bucket = self.signer_client.create_bucket(name)
                 bucket.acl.save_predefined(self.auto_create_acl)
                 return bucket
             raise ImproperlyConfigured("Bucket %s does not exist. Buckets "
@@ -264,7 +301,7 @@ class GoogleCloudStorage(Storage):
         for many use cases.
         """
         name = self._normalize_name(clean_name(name))
-        blob = self.bucket.blob(self._encode_name(name))
+        blob = self.signer_bucket.blob(self._encode_name(name))
 
         if self.default_acl == 'publicRead':
             return blob.public_url
