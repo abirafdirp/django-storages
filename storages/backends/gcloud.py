@@ -124,7 +124,7 @@ class GoogleCloudStorage(Storage):
 
     @property
     def client(self):
-        if self._ is None:
+        if self._client is None:
             self._client = Client(
                 project=self.project_id,
                 credentials=self.credentials
