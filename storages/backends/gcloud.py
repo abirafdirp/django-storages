@@ -142,7 +142,7 @@ class GoogleCloudStorage(Storage):
     @property
     def signer_client(self):
         if self._signer_client is None:
-            self._client = Client(
+            self._signer_client = Client(
                 project=self.project_id,
                 credentials=self.signer_credentials
             )
