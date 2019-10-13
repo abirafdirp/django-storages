@@ -96,7 +96,10 @@ class GoogleCloudStorage(Storage):
     file_name_charset = setting('GS_FILE_NAME_CHARSET', 'utf-8')
     file_overwrite = setting('GS_FILE_OVERWRITE', True)
     cache_control = setting('GS_CACHE_CONTROL')
-    content_disposition = setting('GS_CONTENT_DISPOSITION')
+    space_selfie_content_disposition = setting(
+        'GS_SPACE_SELFIE_CONTENT_DISPOSITION',
+        'attachment; filename=space-selfie.jpg'
+    )
     # The max amount of memory a returned file can take up before being
     # rolled over into a temporary file on disk. Default is 0: Do not roll over.
     max_memory_size = setting('GS_MAX_MEMORY_SIZE', 0)
@@ -175,7 +178,8 @@ class GoogleCloudStorage(Storage):
         encoded_name = self._encode_name(name)
         file = GoogleCloudFile(encoded_name, 'rw', self)
         file.blob.cache_control = self.cache_control
-        file.blob.content_disposition = self.content_disposition
+        if 'space-selfie/2019-' in name:
+            file.blob.content_disposition = self.space_selfie_content_disposition
         if self.default_acl:
             file.blob.upload_from_file(
                 content, rewind=True, size=content.size,
