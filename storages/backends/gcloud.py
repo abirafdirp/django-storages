@@ -94,6 +94,9 @@ class GoogleCloudStorage(BaseStorage):
         self._bucket = None
         self._client = None
 
+        self._signer_bucket = None
+        self._signer_client = None
+
     def get_default_settings(self):
         return {
             "project_id": setting('GS_PROJECT_ID'),
@@ -110,6 +113,9 @@ class GoogleCloudStorage(BaseStorage):
             # roll over.
             "max_memory_size": setting('GS_MAX_MEMORY_SIZE', 0),
             "blob_chunk_size": setting('GS_BLOB_CHUNK_SIZE'),
+
+            # separate signer creds (least privileged service account)
+            "signer_credentials": setting('GS_SIGNER_CREDENTIALS', '')
         }
 
     @property
@@ -122,10 +128,25 @@ class GoogleCloudStorage(BaseStorage):
         return self._client
 
     @property
+    def signer_client(self):
+        if self._signer_client is None:
+            self._signer_client = Client(
+                project=self.project_id,
+                credentials=self.signer_credentials
+            )
+        return self._signer_client
+
+    @property
     def bucket(self):
         if self._bucket is None:
             self._bucket = self.client.bucket(self.bucket_name)
         return self._bucket
+
+    @property
+    def signer_bucket(self):
+        if self._signer_bucket is None:
+            self._signer_bucket = self.signer_client.bucket(self.bucket_name)
+        return self._signer_bucket
 
     def _normalize_name(self, name):
         """
@@ -239,7 +260,7 @@ class GoogleCloudStorage(BaseStorage):
         for many use cases.
         """
         name = self._normalize_name(clean_name(name))
-        blob = self.bucket.blob(name)
+        blob = self.signer_bucket.blob(name)
 
         if not self.custom_endpoint and self.default_acl == 'publicRead':
             return blob.public_url
